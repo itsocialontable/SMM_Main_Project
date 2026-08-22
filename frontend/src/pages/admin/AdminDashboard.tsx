@@ -3372,7 +3372,7 @@ import {
   ShieldCheck, ArrowUpRight, FolderOpen, User, CheckCircle,
   Bell, Menu, Loader2, Sun, Moon, Upload, X,
   Receipt, DollarSign, BarChart3, Plus, Trash, ChevronLeft, ExternalLink,
-  Layers,
+  Layers, FileText, Printer,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip,
@@ -3508,6 +3508,7 @@ type Tab =
   | "revenue"
   | "workspace"
   | "design_projects"
+  | "reports"
   | "profile"
   | "add_client"
   | "add_smm"
@@ -3523,6 +3524,12 @@ interface TeamMember {
   createdAt: string;
   status: "active" | "inactive";
   clientId?: string;
+  // NEW: specialization (e.g. "Reels Editing", "Logo Design"), designation
+  // ("role" jo user ne likha, jaise "Senior SMM Executive") aur experience
+  // (jaise "2 years") — Add SMM / Add GD forms se aate hain.
+  specialization?: string;
+  designation?: string;
+  experience?: string;
 }
 
 interface Client {
@@ -3540,6 +3547,12 @@ interface Client {
   platforms: string[];
   postsThisMonth: number;
   budget?: string;
+  // NEW: Add Client form ke naye fields — address, project title, duration
+  // aur GST number.
+  address?: string;
+  projectTitle?: string;
+  duration?: string;
+  gst?: string;
 }
 
 interface AdminSession {
@@ -3837,12 +3850,17 @@ const AddMemberForm = ({ role, onAdd, onCancel, dm, darkMode }: AddMemberFormPro
     email: "",
     phone: "",
     password: "",
+    // NEW: designation/role text (job title), experience aur specialization
+    designation: "",
+    experience: "",
+    specialization: "",
   });
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
 
   const label = role === "smm" ? "SMM Executive" : "Graphic Designer";
   const accentColor = role === "smm" ? "#33496a" : "#8b5cf6";
+  const specializationPlaceholder = role === "smm" ? "e.g. Content Strategy, Paid Ads" : "e.g. Logo Design, Reels Editing";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -3957,6 +3975,53 @@ const AddMemberForm = ({ role, onAdd, onCancel, dm, darkMode }: AddMemberFormPro
               placeholder="+91 98765 43210"
               style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${dm.borderMd}`, fontSize: 14, color: dm.textSm, outline: "none", boxSizing: "border-box" }}
             />
+          </div>
+
+          {/* NEW: Role/Designation, Experience aur Specialization — both
+              SMM aur GD add-forms ke liye same fields. */}
+          <div>
+            <label style={{ fontSize: 13, fontWeight: 600, color: darkMode ? "#94a3b8" : "#475569", display: "block", marginBottom: 6 }}>
+              Role / Designation
+            </label>
+            <input
+              type="text"
+              name="new_member_designation"
+              autoComplete="off"
+              value={form.designation}
+              onChange={(e) => setForm({ ...form, designation: e.target.value })}
+              placeholder={role === "smm" ? "e.g. SMM Executive" : "e.g. Graphic Designer"}
+              style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${dm.borderMd}`, fontSize: 14, color: dm.textSm, outline: "none", boxSizing: "border-box" }}
+            />
+          </div>
+          <div style={{ display: "flex", gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: darkMode ? "#94a3b8" : "#475569", display: "block", marginBottom: 6 }}>
+                Experience
+              </label>
+              <input
+                type="text"
+                name="new_member_experience"
+                autoComplete="off"
+                value={form.experience}
+                onChange={(e) => setForm({ ...form, experience: e.target.value })}
+                placeholder="e.g. 2 years"
+                style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${dm.borderMd}`, fontSize: 14, color: dm.textSm, outline: "none", boxSizing: "border-box" }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: darkMode ? "#94a3b8" : "#475569", display: "block", marginBottom: 6 }}>
+                Specialization
+              </label>
+              <input
+                type="text"
+                name="new_member_specialization"
+                autoComplete="off"
+                value={form.specialization}
+                onChange={(e) => setForm({ ...form, specialization: e.target.value })}
+                placeholder={specializationPlaceholder}
+                style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${dm.borderMd}`, fontSize: 14, color: dm.textSm, outline: "none", boxSizing: "border-box" }}
+              />
+            </div>
           </div>
 
           <div>
@@ -4306,6 +4371,11 @@ const AdminDashboard = () => {
           budget: u.budget || "",
           assignedSMM: idOf(u.assignedSMM ?? u.smmId ?? u.smm),
           assignedDesigner: idOf(u.assignedDesigner ?? u.designerId ?? u.graphicDesigner ?? u.gdId),
+          // NEW: address, project title, duration aur GST — Add Client form se aate hain.
+          address: u.address || "",
+          projectTitle: u.projectTitle || "",
+          duration: u.duration || "",
+          gst: u.gst || u.gstNumber || "",
         }))
       );
 
@@ -4319,6 +4389,9 @@ const AdminDashboard = () => {
           password: pwCache[u._id] || "••••••",
           createdAt: u.createdAt?.slice(0, 10) || "",
           status: (u.isActive ? "active" : "inactive") as "active" | "inactive",
+          specialization: u.specialization || "",
+          designation: u.designation || "",
+          experience: u.experience || "",
         })),
         ...gdUsers.map((u: any) => ({
           id: u._id,
@@ -4329,6 +4402,9 @@ const AdminDashboard = () => {
           password: pwCache[u._id] || "••••••",
           createdAt: u.createdAt?.slice(0, 10) || "",
           status: (u.isActive ? "active" : "inactive") as "active" | "inactive",
+          specialization: u.specialization || "",
+          designation: u.designation || "",
+          experience: u.experience || "",
         })),
       ];
 
@@ -4704,6 +4780,7 @@ const AdminDashboard = () => {
     { id: "analytics", icon: BarChart3, label: "Analytics" },
     { id: "revenue", icon: DollarSign, label: "Revenue" },
     { id: "design_projects", icon: Layers, label: "Design Project", count: projects.length || undefined },
+    { id: "reports", icon: FileText, label: "Report Overview" },
     { id: "workspace", icon: FolderOpen, label: "Workspace" },
     { id: "profile", icon: User, label: "Profile" },
   ];
@@ -5985,7 +6062,12 @@ const AdminDashboard = () => {
 
   // ── ADD CLIENT TAB ────────────────────────────────────────────────────────
   const AddClientTab = () => {
-    const [form, setForm] = useState({ name: "", email: "", phone: "", company: "", password: "", budget: "", assignedSMM: "", assignedDesigner: "" });
+    const [form, setForm] = useState({
+      name: "", email: "", phone: "", company: "", password: "", budget: "",
+      assignedSMM: "", assignedDesigner: "",
+      // NEW: address, industry, project title, duration aur GST — Add Client form ke naye fields.
+      address: "", industry: "", projectTitle: "", duration: "", gst: "",
+    });
     const [loading, setLoading] = useState(false);
     const [showPw, setShowPw] = useState(false);
     const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
@@ -6018,6 +6100,12 @@ const AdminDashboard = () => {
         // NEW: assign karte hi backend me client ke saath link ho jaate hain.
         assignedSMM: form.assignedSMM || undefined,
         assignedDesigner: form.assignedDesigner || undefined,
+        // NEW: address, industry, project title, duration aur GST bhi backend ko bhejte hain.
+        address: form.address,
+        industry: form.industry,
+        projectTitle: form.projectTitle,
+        duration: form.duration,
+        gst: form.gst,
       };
       const { error, data } = await apiAdminCreateUser(token, body);
       setLoading(false);
@@ -6027,10 +6115,14 @@ const AdminDashboard = () => {
       const nc: Client = {
         id: newId, name: form.name, email: form.email, phone: form.phone,
         company: form.company, password: form.password, budget: form.budget,
-        industry: "", createdAt: new Date().toISOString().slice(0, 10),
+        industry: form.industry, createdAt: new Date().toISOString().slice(0, 10),
         status: "active", platforms: selectedPlatforms, postsThisMonth: 0,
         assignedSMM: form.assignedSMM || undefined,
         assignedDesigner: form.assignedDesigner || undefined,
+        address: form.address,
+        projectTitle: form.projectTitle,
+        duration: form.duration,
+        gst: form.gst,
       };
       setClients((c) => [nc, ...c]);
 
@@ -6087,6 +6179,33 @@ const AdminDashboard = () => {
             <div>
               <label style={{ fontSize: 13, fontWeight: 600, color: darkMode ? "#94a3b8" : "#475569", display: "block", marginBottom: 6 }}>Company Name</label>
               <input type="text" name="new_client_company" autoComplete="off" value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} placeholder="Company Pvt. Ltd." style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${dm.borderMd}`, fontSize: 14, color: dm.textSm, outline: "none", boxSizing: "border-box", background: dm.input }} />
+            </div>
+            {/* NEW: Address */}
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 600, color: darkMode ? "#94a3b8" : "#475569", display: "block", marginBottom: 6 }}>Address</label>
+              <input type="text" name="new_client_address" autoComplete="off" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="e.g. 12, MG Road, Jaipur" style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${dm.borderMd}`, fontSize: 14, color: dm.textSm, outline: "none", boxSizing: "border-box", background: dm.input }} />
+            </div>
+            {/* NEW: Industry aur Project Title ek row me */}
+            <div style={{ display: "flex", gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: darkMode ? "#94a3b8" : "#475569", display: "block", marginBottom: 6 }}>Industry</label>
+                <input type="text" name="new_client_industry" autoComplete="off" value={form.industry} onChange={(e) => setForm({ ...form, industry: e.target.value })} placeholder="e.g. Fashion, Real Estate" style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${dm.borderMd}`, fontSize: 14, color: dm.textSm, outline: "none", boxSizing: "border-box", background: dm.input }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: darkMode ? "#94a3b8" : "#475569", display: "block", marginBottom: 6 }}>Project Title</label>
+                <input type="text" name="new_client_project_title" autoComplete="off" value={form.projectTitle} onChange={(e) => setForm({ ...form, projectTitle: e.target.value })} placeholder="e.g. Instagram Growth" style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${dm.borderMd}`, fontSize: 14, color: dm.textSm, outline: "none", boxSizing: "border-box", background: dm.input }} />
+              </div>
+            </div>
+            {/* NEW: Duration aur GST ek row me */}
+            <div style={{ display: "flex", gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: darkMode ? "#94a3b8" : "#475569", display: "block", marginBottom: 6 }}>Duration</label>
+                <input type="text" name="new_client_duration" autoComplete="off" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="e.g. 6 months" style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${dm.borderMd}`, fontSize: 14, color: dm.textSm, outline: "none", boxSizing: "border-box", background: dm.input }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: darkMode ? "#94a3b8" : "#475569", display: "block", marginBottom: 6 }}>GST Number</label>
+                <input type="text" name="new_client_gst" autoComplete="off" value={form.gst} onChange={(e) => setForm({ ...form, gst: e.target.value })} placeholder="e.g. 08AAACX1234E1Z5" style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${dm.borderMd}`, fontSize: 14, color: dm.textSm, outline: "none", boxSizing: "border-box", background: dm.input }} />
+              </div>
             </div>
             <div>
               <label style={{ fontSize: 13, fontWeight: 600, color: darkMode ? "#94a3b8" : "#475569", display: "block", marginBottom: 6 }}>Budget</label>
@@ -7458,6 +7577,136 @@ const AdminDashboard = () => {
     );
   };
 
+  // ── REPORT OVERVIEW TAB ──────────────────────────────────────────────────
+  // NEW: Admin ke liye ek consolidated "Report Overview" — clients, team
+  // aur revenue ka ek hi jagah snapshot, print/export karne layak.
+  const ReportsOverviewTab = () => {
+    const totals = revenueData?.totals;
+    const currency = invoices[0]?.currency || "INR";
+    const totalBudget = clients.reduce((sum, c) => {
+      const n = parseFloat(String(c.budget || "0").replace(/[^0-9.]/g, ""));
+      return sum + (isNaN(n) ? 0 : n);
+    }, 0);
+
+    const summaryCards = [
+      { label: "Total Clients", value: clients.length, color: "#3b82f6" },
+      { label: "SMM Executives", value: smm.length, color: "#33496a" },
+      { label: "Graphic Designers", value: gd.length, color: "#8b5cf6" },
+      { label: "Design Projects", value: projects.length, color: "#ec4899" },
+      { label: "Total Invoices", value: invoices.length, color: "#f59e0b" },
+      { label: "Total Revenue", value: formatCurrency(totals?.totalRevenue || 0, currency), color: "#16a34a" },
+    ];
+
+    return (
+      <div style={{ maxWidth: 1200 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }} className="reports-overview__no-print">
+          <div>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: dm.text, margin: 0 }}>Report Overview</h1>
+            <p style={{ fontSize: 13, color: dm.muted, marginTop: 3 }}>
+              Agency ka ek jagah pura snapshot — clients, team aur revenue.
+            </p>
+          </div>
+          <button
+            onClick={() => window.print()}
+            style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, padding: "10px 16px", borderRadius: 10, border: `1.5px solid ${dm.borderMd}`, background: dm.card, color: dm.text, cursor: "pointer" }}
+          >
+            <Printer size={15} /> Print / Export
+          </button>
+        </div>
+
+        {/* Summary Cards */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16, marginBottom: 28 }}>
+          {summaryCards.map((s) => (
+            <div key={s.label} style={{ background: dm.card, borderRadius: 16, padding: "16px 18px", border: `1px solid ${dm.border}`, boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: s.color }}>{s.value}</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: dm.muted, marginTop: 4 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Clients Report Table */}
+        <div style={{ background: dm.card, borderRadius: 18, border: `1px solid ${dm.border}`, boxShadow: "0 4px 24px rgba(0,0,0,0.06)", marginBottom: 24, overflow: "hidden" }}>
+          <div style={{ padding: "16px 20px", borderBottom: `1px solid ${dm.border}`, fontSize: 14.5, fontWeight: 800, color: dm.text }}>
+            Client-wise Report
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: darkMode ? "#0f172a" : "#f8fafc" }}>
+                  {["Client", "Project Title", "Industry", "Duration", "Budget", "GST", "Assigned SMM", "Assigned Designer"].map((h) => (
+                    <th key={h} style={{ textAlign: "left", padding: "10px 16px", fontWeight: 700, color: dm.muted, fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.4px", whiteSpace: "nowrap" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {clients.length === 0 && (
+                  <tr><td colSpan={8} style={{ padding: 20, textAlign: "center", color: dm.muted, fontSize: 13 }}>Koi client nahi mila.</td></tr>
+                )}
+                {clients.map((c) => (
+                  <tr key={c.id} style={{ borderTop: `1px solid ${dm.border}` }}>
+                    <td style={{ padding: "10px 16px", fontWeight: 600, color: dm.text }}>{c.name}</td>
+                    <td style={{ padding: "10px 16px", color: dm.textSm }}>{c.projectTitle || "—"}</td>
+                    <td style={{ padding: "10px 16px", color: dm.textSm }}>{c.industry || "—"}</td>
+                    <td style={{ padding: "10px 16px", color: dm.textSm }}>{c.duration || "—"}</td>
+                    <td style={{ padding: "10px 16px", color: dm.textSm }}>{c.budget || "—"}</td>
+                    <td style={{ padding: "10px 16px", color: dm.textSm }}>{c.gst || "—"}</td>
+                    <td style={{ padding: "10px 16px", color: dm.textSm }}>{team.find((t) => t.id === c.assignedSMM)?.name || "—"}</td>
+                    <td style={{ padding: "10px 16px", color: dm.textSm }}>{team.find((t) => t.id === c.assignedDesigner)?.name || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+              {clients.length > 0 && (
+                <tfoot>
+                  <tr style={{ borderTop: `2px solid ${dm.border}` }}>
+                    <td colSpan={4} style={{ padding: "10px 16px", fontWeight: 700, color: dm.text }}>Total Budget (approx.)</td>
+                    <td colSpan={4} style={{ padding: "10px 16px", fontWeight: 700, color: "#16a34a" }}>{formatCurrency(totalBudget, currency)}</td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </div>
+
+        {/* Team Report Table */}
+        <div style={{ background: dm.card, borderRadius: 18, border: `1px solid ${dm.border}`, boxShadow: "0 4px 24px rgba(0,0,0,0.06)", overflow: "hidden" }}>
+          <div style={{ padding: "16px 20px", borderBottom: `1px solid ${dm.border}`, fontSize: 14.5, fontWeight: 800, color: dm.text }}>
+            Team Report (SMM &amp; Graphic Designers)
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: darkMode ? "#0f172a" : "#f8fafc" }}>
+                  {["Name", "Role", "Designation", "Specialization", "Experience", "Status"].map((h) => (
+                    <th key={h} style={{ textAlign: "left", padding: "10px 16px", fontWeight: 700, color: dm.muted, fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.4px", whiteSpace: "nowrap" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {team.length === 0 && (
+                  <tr><td colSpan={6} style={{ padding: 20, textAlign: "center", color: dm.muted, fontSize: 13 }}>Koi team member nahi mila.</td></tr>
+                )}
+                {team.map((m) => (
+                  <tr key={m.id} style={{ borderTop: `1px solid ${dm.border}` }}>
+                    <td style={{ padding: "10px 16px", fontWeight: 600, color: dm.text }}>{m.name}</td>
+                    <td style={{ padding: "10px 16px", color: dm.textSm }}>{m.role === "smm" ? "SMM Executive" : "Graphic Designer"}</td>
+                    <td style={{ padding: "10px 16px", color: dm.textSm }}>{m.designation || "—"}</td>
+                    <td style={{ padding: "10px 16px", color: dm.textSm }}>{m.specialization || "—"}</td>
+                    <td style={{ padding: "10px 16px", color: dm.textSm }}>{m.experience || "—"}</td>
+                    <td style={{ padding: "10px 16px" }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: m.status === "active" ? "#dcfce7" : "#fee2e2", color: m.status === "active" ? "#16a34a" : "#dc2626" }}>
+                        {m.status === "active" ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ── RENDER ────────────────────────────────────────────────────────────────
   if (!authChecked || !adminSession) {
     return (
@@ -8642,6 +8891,7 @@ const AdminDashboard = () => {
               </div>
           )}
           {tab === "profile" && <ProfileTab />}
+          {tab === "reports" && <ReportsOverviewTab />}
           {tab === "add_client" && <AddClientTab />}
           {tab === "add_smm" && (
             <AddMemberForm
@@ -8654,6 +8904,10 @@ const AdminDashboard = () => {
                   password: m.password,
                   role: "SMM",
                   phoneNumber: m.phone,
+                  // NEW: designation, experience, specialization backend ko bhi bhejte hain
+                  designation: m.designation,
+                  experience: m.experience,
+                  specialization: m.specialization,
                 };
                 const { error, data } = await apiAdminCreateUser(token, body);
                 if (error) {
@@ -8683,6 +8937,10 @@ const AdminDashboard = () => {
                   password: m.password,
                   role: "Graphic Designer",
                   phoneNumber: m.phone,
+                  // NEW: designation, experience, specialization backend ko bhi bhejte hain
+                  designation: m.designation,
+                  experience: m.experience,
+                  specialization: m.specialization,
                 };
                 const { error, data } = await apiAdminCreateUser(token, body);
                 if (error) {
@@ -8721,6 +8979,11 @@ const AdminDashboard = () => {
                 { label: "Email *", key: "email", type: "email", placeholder: "client@company.com" },
                 { label: "Phone", key: "phone", type: "text", placeholder: "+91 98765 43210" },
                 { label: "Company", key: "company", type: "text", placeholder: "Company Pvt. Ltd." },
+                { label: "Address", key: "address", type: "text", placeholder: "12, MG Road, Jaipur" },
+                { label: "Industry", key: "industry", type: "text", placeholder: "Fashion, Real Estate" },
+                { label: "Project Title", key: "projectTitle", type: "text", placeholder: "Instagram Growth" },
+                { label: "Duration", key: "duration", type: "text", placeholder: "6 months" },
+                { label: "GST Number", key: "gst", type: "text", placeholder: "08AAACX1234E1Z5" },
                 { label: "Budget", key: "budget", type: "text", placeholder: "₹50,000 / month" },
               ] as { label: string; key: keyof Client; type: string; placeholder: string }[]).map(({ label, key, type, placeholder }) => (
                 <div key={key}>
@@ -8825,6 +9088,12 @@ const AdminDashboard = () => {
                     platforms: editClient.platforms,
                     assignedSMM: editClient.assignedSMM || undefined,
                     assignedDesigner: editClient.assignedDesigner || undefined,
+                    // NEW: address, industry, project title, duration aur GST bhi update karte hain.
+                    address: editClient.address,
+                    industry: editClient.industry,
+                    projectTitle: editClient.projectTitle,
+                    duration: editClient.duration,
+                    gst: editClient.gst,
                   });
                   if (error) {
                     setEditClientSaving(false);
@@ -8892,6 +9161,9 @@ const AdminDashboard = () => {
                 { label: "Full Name *", key: "name", type: "text", placeholder: "Karan Mehta" },
                 { label: "Email *", key: "email", type: "email", placeholder: "karan@agency.com" },
                 { label: "Phone", key: "phone", type: "text", placeholder: "+91 98765 43210" },
+                { label: "Role / Designation", key: "designation", type: "text", placeholder: "SMM Executive" },
+                { label: "Experience", key: "experience", type: "text", placeholder: "2 years" },
+                { label: "Specialization", key: "specialization", type: "text", placeholder: "Content Strategy" },
               ] as { label: string; key: keyof TeamMember; type: string; placeholder: string }[]).map(({ label, key, type, placeholder }) => (
                 <div key={key}>
                   <label style={{ fontSize: 12.5, fontWeight: 600, color: darkMode ? "#94a3b8" : "#475569", display: "block", marginBottom: 5 }}>{label}</label>
@@ -8938,6 +9210,10 @@ const AdminDashboard = () => {
                     email: editMember.email,
                     phoneNumber: editMember.phone,
                     status: editMember.status,
+                    // NEW: designation, experience aur specialization bhi update karte hain.
+                    designation: editMember.designation,
+                    experience: editMember.experience,
+                    specialization: editMember.specialization,
                   });
                   if (error) {
                     setEditMemberSaving(false);

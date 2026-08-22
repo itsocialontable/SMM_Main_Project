@@ -4,17 +4,17 @@ import { toast } from "sonner";
 import {
   Palette, LogOut, CheckCircle2, Clock, AlertCircle,
   FileImage, MessageSquare, Calendar, Upload, Send,
-  X, ChevronRight, Image, Film, BookImage, Eye,
+  X, ChevronRight, Image, Film, BookImage, Eye, EyeOff,
   TrendingUp, Layers, Star, Bell, Search, Filter,
   ArrowUpRight, Zap, MoreHorizontal, Download, Paperclip,
-  RefreshCw, User, Loader2
+  RefreshCw, User, Loader2, Save, Mail, Phone
 } from "lucide-react";
-import { clearSession, getSession, BASE_URL } from "@/lib/api";
+import { clearSession, getSession, BASE_URL, apiGetProfile, apiUpdateProfile, apiChangePassword, type ProfileUser } from "@/lib/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Priority = "High" | "Medium" | "Low" | "Urgent";
 type TaskStatus = "Pending" | "In Progress" | "Under Review" | "Revision" | "Completed" | "Cancelled";
-type GDView = "overview" | "tasks" | "uploads" | "my_uploads";
+type GDView = "overview" | "tasks" | "uploads" | "my_uploads" | "profile";
 
 interface DesignFile {
   _id: string;
@@ -456,6 +456,16 @@ const GDDashboard = () => {
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
+  // ── Profile state ──
+  const [profile, setProfile] = useState<ProfileUser | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({ name: "", mobileNumber: "" });
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [pwForm, setPwForm] = useState({ oldPassword: "", newPassword: "", confirmPassword: "" });
+  const [savingPw, setSavingPw] = useState(false);
+  const [showOldPw, setShowOldPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
+
   // ── Init
   useEffect(() => {
     const session = getSession();
@@ -542,6 +552,20 @@ const GDDashboard = () => {
     }
   }, [token]);
 
+  // ── Load profile
+  const loadProfile = useCallback(async () => {
+    if (!token) return;
+    setLoadingProfile(true);
+    const { data, error } = await apiGetProfile(token);
+    setLoadingProfile(false);
+    if (error) { toast.error("Profile load nahi hui: " + error); return; }
+    const u = data?.user;
+    if (u) {
+      setProfile(u);
+      setProfileForm({ name: u.name || "", mobileNumber: u.mobileNumber || "" });
+    }
+  }, [token]);
+
   useEffect(() => {
     if (token) { loadStats(); loadDeadlines(); loadNotifications(); }
   }, [token, loadStats, loadDeadlines, loadNotifications]);
@@ -549,7 +573,8 @@ const GDDashboard = () => {
   useEffect(() => {
     if (token && (view === "tasks" || view === "uploads")) loadTasks();
     if (token && view === "my_uploads") loadAllUploadedFiles();
-  }, [token, view, filterStatus, searchQuery, loadTasks, loadAllUploadedFiles]);
+    if (token && view === "profile") loadProfile();
+  }, [token, view, filterStatus, searchQuery, loadTasks, loadAllUploadedFiles, loadProfile]);
 
   useEffect(() => {
     if (selectedTask?._id) loadTaskDetail(selectedTask._id);
@@ -588,6 +613,43 @@ const GDDashboard = () => {
     toast.success("Logged out!");
   };
 
+  // ── Save Profile ──
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profileForm.name.trim()) { toast.error("Name required hai"); return; }
+    setSavingProfile(true);
+    const { data, error } = await apiUpdateProfile(token, profileForm.name.trim(), profileForm.mobileNumber.trim());
+    setSavingProfile(false);
+    if (error) { toast.error(error); return; }
+    if (data?.user) setProfile(data.user);
+    setUserName(profileForm.name.trim());
+    localStorage.setItem("socialflow_user_name", profileForm.name.trim());
+    toast.success("Profile update ho gayi!");
+  };
+
+  // ── Change Password ──
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pwForm.oldPassword || !pwForm.newPassword || !pwForm.confirmPassword) {
+      toast.error("Sab password fields bharna zaroori hai");
+      return;
+    }
+    if (pwForm.newPassword !== pwForm.confirmPassword) {
+      toast.error("New password match nahi kar raha");
+      return;
+    }
+    if (pwForm.newPassword.length < 8) {
+      toast.error("New password kam se kam 8 characters ka ho");
+      return;
+    }
+    setSavingPw(true);
+    const { error } = await apiChangePassword(token, pwForm.oldPassword, pwForm.newPassword);
+    setSavingPw(false);
+    if (error) { toast.error(error); return; }
+    setPwForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
+    toast.success("Password change ho gaya!");
+  };
+
   const counts = {
     all: stats?.totalTasks || tasks.length,
     pending: stats?.pendingTasks || 0,
@@ -603,6 +665,7 @@ const GDDashboard = () => {
     { key: "tasks", label: "All Tasks", icon: FileImage },
     { key: "uploads", label: "Uploads", icon: Upload },
     { key: "my_uploads", label: "My Uploads", icon: Image },
+    { key: "profile", label: "Profile", icon: User },
   ];
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -616,7 +679,7 @@ const GDDashboard = () => {
         </div>
         <div style={{ padding: "16px 16px 0" }}>
           {/* Profile Card */}
-          <div style={{ background: "linear-gradient(135deg, #faf5ff, #ede9fe)", borderRadius: 14, padding: "14px", border: "1px solid #ddd6fe", marginBottom: 20 }}>
+          <div style={{ background: "linear-gradient(135deg, #faf5ff, #ede9fe)", borderRadius: 14, padding: "14px", border: "1px solid #ddd6fe", marginBottom: 20, cursor: "pointer" }} onClick={() => setView("profile")} title="View Profile">
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div style={{ width: 40, height: 40, borderRadius: 12, background: "linear-gradient(135deg, #7c3aed, #a855f7)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 4px 10px rgba(124,58,237,0.3)" }}>
                 <Palette size={18} color="white" />
@@ -689,10 +752,10 @@ const GDDashboard = () => {
         <header style={{ background: "white", borderBottom: "1px solid #f1f5f9", padding: "0 28px", height: 64, display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 1px 0 #f1f5f9", flexShrink: 0 }}>
           <div>
             <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", letterSpacing: "-0.4px" }}>
-              {view === "overview" ? "Dashboard Overview" : view === "tasks" ? "My Design Tasks" : view === "uploads" ? "Upload Center" : "My Uploads"}
+              {view === "overview" ? "Dashboard Overview" : view === "tasks" ? "My Design Tasks" : view === "uploads" ? "Upload Center" : view === "my_uploads" ? "My Uploads" : "My Profile"}
             </div>
             <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 1, fontWeight: 500 }}>
-              {view === "overview" ? "Your daily work summary & active tasks" : view === "tasks" ? "Tasks assigned by SMM team" : view === "uploads" ? "Upload completed designs" : "Sab files jo aapne upload ki hain"}
+              {view === "overview" ? "Your daily work summary & active tasks" : view === "tasks" ? "Tasks assigned by SMM team" : view === "uploads" ? "Upload completed designs" : view === "my_uploads" ? "Sab files jo aapne upload ki hain" : "Apni profile dekhein aur update karein"}
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1194,6 +1257,101 @@ const GDDashboard = () => {
               </div>
             );
           })()}
+
+          {/* ── PROFILE VIEW ── */}
+          {view === "profile" && (
+            <div style={{ maxWidth: 640 }}>
+              {loadingProfile ? (
+                <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}><Loader2 size={24} className="animate-spin" /></div>
+              ) : (
+                <>
+                  {/* Profile Summary Card */}
+                  <div style={{ background: "linear-gradient(135deg, #faf5ff, #ede9fe)", borderRadius: 16, padding: 22, border: "1px solid #ddd6fe", marginBottom: 20, display: "flex", alignItems: "center", gap: 16 }}>
+                    <div style={{ width: 56, height: 56, borderRadius: 16, background: "linear-gradient(135deg, #7c3aed, #a855f7)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 6px 16px rgba(124,58,237,0.3)", fontSize: 22, fontWeight: 800, color: "white" }}>
+                      {(profile?.name || userName || "D").charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 17, fontWeight: 800, color: "#1e1b4b" }}>{profile?.name || userName}</div>
+                      <div style={{ fontSize: 12.5, color: "#7c3aed", fontWeight: 600, marginTop: 2 }}>
+                        {profile?.designation || "Graphic Designer"}
+                        {profile?.specialization ? ` · ${profile.specialization}` : ""}
+                      </div>
+                      <div style={{ display: "flex", gap: 14, marginTop: 8, flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#64748b" }}>
+                          <Mail size={13} /> {profile?.email || "—"}
+                        </div>
+                        {profile?.experience && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#64748b" }}>
+                            <Star size={13} /> {profile.experience} experience
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Edit Profile Form */}
+                  <div style={{ background: "white", borderRadius: 16, padding: 22, border: "1px solid #f1f5f9", boxShadow: "0 2px 12px rgba(0,0,0,0.04)", marginBottom: 20 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                      <User size={16} color="#7c3aed" /> Edit Profile
+                    </div>
+                    <form onSubmit={handleSaveProfile} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                      <div>
+                        <label style={{ fontSize: 12.5, fontWeight: 600, color: "#475569", display: "block", marginBottom: 5 }}>Full Name</label>
+                        <input type="text" value={profileForm.name} onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} placeholder="Your name" style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 13.5, outline: "none", boxSizing: "border-box" }} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 12.5, fontWeight: 600, color: "#475569", display: "block", marginBottom: 5 }}>Phone Number</label>
+                        <input type="text" value={profileForm.mobileNumber} onChange={(e) => setProfileForm({ ...profileForm, mobileNumber: e.target.value })} placeholder="+91 98765 43210" style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 13.5, outline: "none", boxSizing: "border-box" }} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 12.5, fontWeight: 600, color: "#475569", display: "block", marginBottom: 5 }}>Email</label>
+                        <input type="email" value={profile?.email || ""} disabled style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 13.5, outline: "none", boxSizing: "border-box", background: "#f8fafc", color: "#94a3b8" }} />
+                      </div>
+                      <button type="submit" disabled={savingProfile} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "11px", borderRadius: 10, border: "none", background: savingProfile ? "#e2e8f0" : "linear-gradient(135deg, #7c3aed, #a855f7)", color: savingProfile ? "#94a3b8" : "white", fontWeight: 700, fontSize: 13.5, cursor: savingProfile ? "not-allowed" : "pointer" }}>
+                        {savingProfile ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+                        Save Changes
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Change Password Form */}
+                  <div style={{ background: "white", borderRadius: 16, padding: 22, border: "1px solid #f1f5f9", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                      <Eye size={16} color="#7c3aed" /> Change Password
+                    </div>
+                    <form onSubmit={handleChangePassword} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                      <div>
+                        <label style={{ fontSize: 12.5, fontWeight: 600, color: "#475569", display: "block", marginBottom: 5 }}>Current Password</label>
+                        <div style={{ position: "relative" }}>
+                          <input type={showOldPw ? "text" : "password"} value={pwForm.oldPassword} onChange={(e) => setPwForm({ ...pwForm, oldPassword: e.target.value })} placeholder="Current password" style={{ width: "100%", padding: "10px 40px 10px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 13.5, outline: "none", boxSizing: "border-box" }} />
+                          <button type="button" onClick={() => setShowOldPw(!showOldPw)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer" }}>
+                            {showOldPw ? <EyeOff size={15} color="#94a3b8" /> : <Eye size={15} color="#94a3b8" />}
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 12.5, fontWeight: 600, color: "#475569", display: "block", marginBottom: 5 }}>New Password</label>
+                        <div style={{ position: "relative" }}>
+                          <input type={showNewPw ? "text" : "password"} value={pwForm.newPassword} onChange={(e) => setPwForm({ ...pwForm, newPassword: e.target.value })} placeholder="New password (min 8 characters)" style={{ width: "100%", padding: "10px 40px 10px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 13.5, outline: "none", boxSizing: "border-box" }} />
+                          <button type="button" onClick={() => setShowNewPw(!showNewPw)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer" }}>
+                            {showNewPw ? <EyeOff size={15} color="#94a3b8" /> : <Eye size={15} color="#94a3b8" />}
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 12.5, fontWeight: 600, color: "#475569", display: "block", marginBottom: 5 }}>Confirm New Password</label>
+                        <input type={showNewPw ? "text" : "password"} value={pwForm.confirmPassword} onChange={(e) => setPwForm({ ...pwForm, confirmPassword: e.target.value })} placeholder="Re-enter new password" style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 13.5, outline: "none", boxSizing: "border-box" }} />
+                      </div>
+                      <button type="submit" disabled={savingPw} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "11px", borderRadius: 10, border: "none", background: savingPw ? "#e2e8f0" : "linear-gradient(135deg, #7c3aed, #a855f7)", color: savingPw ? "#94a3b8" : "white", fontWeight: 700, fontSize: 13.5, cursor: savingPw ? "not-allowed" : "pointer" }}>
+                        {savingPw && <Loader2 size={15} className="animate-spin" />}
+                        Update Password
+                      </button>
+                    </form>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </main>
 

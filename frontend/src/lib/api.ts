@@ -236,6 +236,12 @@ export interface ProfileUser {
   name: string;
   email: string;
   mobileNumber: string;
+  // NEW: role/specialization/experience — agar backend inhe profile response
+  // me bhejta hai (SMM/GD ke liye), to Profile section me dikhaye jaate hain.
+  role?: string;
+  specialization?: string;
+  designation?: string;
+  experience?: string;
 }
 
 export interface ProfileRes {
@@ -263,6 +269,21 @@ export const apiDeleteProfile = (token: string, password: string) =>
     "DELETE",
     token,
     { password }
+  );
+
+// NEW: Non-admin users (SMM / Graphic Designer / Client) ke liye password
+// change karne ka generic endpoint — admin ke "apiAdminChangePassword" jaisa
+// hi pattern follow karta hai.
+export const apiChangePassword = (
+  token: string,
+  oldPassword: string,
+  newPassword: string
+) =>
+  authRequest<{ success?: boolean; message?: string; msg?: string }>(
+    "/api/user/change-password",
+    "PUT",
+    token,
+    { oldPassword, newPassword }
   );
 
 // ─── SOCIAL CONNECT ───────────────────────────────────────────────────────────
